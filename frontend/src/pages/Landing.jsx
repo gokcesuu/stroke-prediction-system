@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import React from 'react';
 import { 
   Bell, Settings, Zap, ArrowRight, Activity, 
@@ -6,34 +8,10 @@ import {
 } from 'lucide-react';
 
 const Landing = () => {
+  const navigate = useNavigate();
   return (
     <div className="bg-[#041329] text-[#d6e3ff] font-sans selection:bg-[#adc6ff]/30 min-h-screen flex flex-col overflow-x-hidden">
-      {/* Üst Navigasyon Bar */}
-      <nav className="fixed top-0 w-full z-50 bg-[#041329]/80 backdrop-blur-xl border-b border-white/5">
-        <div className="flex justify-between items-center h-16 px-8 w-full max-w-[1440px] mx-auto">
-          <div className="text-2xl font-black text-[#adc6ff] tracking-tighter">StrokePredict AI</div>
-          <div className="hidden lg:flex gap-8 items-center">
-            <Link className="text-[#adc6ff] border-b-2 border-[#1a7dff] pb-1 font-bold transition-all duration-300" to="/">Anasayfa</Link>
-            <Link className="text-[#93a1b8] hover:text-[#adc6ff] transition-colors font-medium" to="/history">Hasta Geçmişi</Link>
-            <Link className="text-[#adc6ff] border-b-2 border-[#1a7dff] pb-1 font-bold transition-all duration-300" to="/analysis">Analiz Paneli</Link>
-            <Link className="text-[#93a1b8] hover:text-[#adc6ff] transition-colors font-medium" to="/lab">Araştırma Laboratuvarı</Link>
-            <Link className="text-[#93a1b8] hover:text-[#adc6ff] transition-colors font-medium" to="/docs">Dokümantasyon</Link>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex gap-2">
-              <button className="text-[#adc6ff] hover:bg-[#1c2a41]/50 p-2 rounded-lg transition-all duration-300">
-                <Bell size={20} />
-              </button>
-              <button className="text-[#adc6ff] hover:bg-[#1c2a41]/50 p-2 rounded-lg transition-all duration-300">
-                <Settings size={20} />
-              </button>
-            </div>
-            <div className="w-8 h-8 rounded-full border border-[#1a7dff]/30 overflow-hidden">
-              <img alt="User" className="w-full h-full object-cover" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Irem" />
-            </div>
-          </div>
-        </div>
-      </nav>
+    
 
       <main className="flex-grow pt-16 flex flex-col">
         {/* Hero Section */}
@@ -56,15 +34,22 @@ const Landing = () => {
               <p className="text-lg text-[#c5c6cd] leading-relaxed max-w-xl">
                 Mitat Uysal'ın Göçmen Kuşlar Algoritması ile <span className="text-[#d6e3ff] font-semibold underline decoration-[#adc6ff]/40 underline-offset-4">%95 doğruluk oranına</span> sahip klinik analiz platformu.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <button className="group relative px-8 py-4 bg-[#adc6ff] text-[#002e69] rounded-xl font-extrabold text-base transition-all duration-300 active:scale-95 flex items-center justify-center gap-3 hover:shadow-[0_0_40px_rgba(173,198,255,0.3)]">
-                  Hemen Analiz Et
-                  <ArrowRight className="transition-transform group-hover:translate-x-1" size={20} />
-                </button>
-                <button className="px-8 py-4 bg-white/5 border border-[#44474d]/30 hover:bg-white/10 backdrop-blur-sm rounded-xl font-bold text-[#d6e3ff] transition-all duration-300">
-                  Nasıl Çalışır?
-                </button>
-              </div>
+     <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            <button 
+              onClick={() => navigate('/analysis')}
+              className="group relative px-8 py-4 bg-[#adc6ff] text-[#002e69] rounded-xl font-extrabold text-base transition-all duration-300 active:scale-95 flex items-center gap-2"
+            >
+              Hemen Analiz Et
+              <ArrowRight className="transition-transform group-hover:translate-x-1" size={20} />
+            </button>
+
+            <button 
+              onClick={() => navigate('/docs')}
+              className="px-8 py-4 bg-white/5 border border-[#44474d]/30 hover:bg-white/10 backdrop-blur-sm rounded-xl font-bold text-[#d6e3ff] transition-all"
+            >
+              Nasıl Çalışır?
+            </button>
+          </div>
             </div>
 
             {/* Sağdaki İstatistik Kartı */}
@@ -110,13 +95,13 @@ const Landing = () => {
               icon={<ShieldCheck size={24}/>} 
               title="Klinik Güven & Şeffaflık" 
               desc="Dünya çapındaki klinik yönergelerle tam uyumlu yapı."
-              tags={["HIPAA", "CE CERTIFIED"]}
+              tags={["VERİ GİZLİLİĞİ", "KLİNİK PROTOKOL"]}
             />
             <FeatureCard 
               icon={<Gauge size={24}/>} 
               title="Hızlı Analiz" 
               desc="Saniyeler içinde sonuç veren gelişmiş sinir ağları."
-              link="Detayları Gör"
+              
             />
             <FeatureCard 
               icon={<Zap size={24}/>} 

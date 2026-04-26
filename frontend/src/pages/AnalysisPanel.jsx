@@ -29,16 +29,7 @@ const AnalysisPanel = () => {
 
   return (
     <div className="bg-[#f6f6f8] min-h-screen font-display">
-      {/* Navigasyon */}
-      <header className="bg-white border-b border-[#143db8]/10 px-6 py-3 md:px-20 flex justify-between items-center">
-        <Link to="/" className="flex items-center gap-3 no-underline text-[#143db8]">
-          <Brain size={24} /> <span className="font-bold text-lg">StrokePredict AI</span>
-        </Link>
-        <nav className="flex gap-6 text-sm font-bold text-slate-500">
-          <Link to="/history" className="hover:text-[#143db8] no-underline">Geçmiş</Link>
-          <Link to="/docs" className="hover:text-[#143db8] no-underline">Dokümantasyon</Link>
-        </nav>
-      </header>
+     
 
       <main className="p-8 md:px-20 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1600px] mx-auto">
         

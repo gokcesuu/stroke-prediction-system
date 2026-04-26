@@ -17,30 +17,7 @@ const PatientHistory = () => {
   return (
     <div className="bg-[#f6f6f8] dark:bg-[#111521] font-sans text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-300">
       <div className="flex h-full flex-col">
-        {/* Üst Navigasyon - Dr. İrem Profili ile */}
-        <header className="sticky top-0 z-50 bg-white/70 dark:bg-[#111521]/70 backdrop-blur-xl border-b border-[#143db8]/10 px-6 py-3 md:px-20 lg:px-40 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-4 text-[#143db8] no-underline">
-            <div className="w-8 h-8 bg-[#143db8] rounded-lg flex items-center justify-center text-white">
-              <Brain size={20} />
-            </div>
-            <h2 className="text-lg font-bold tracking-tight">StrokePredict AI</h2>
-          </Link>
-          <div className="flex flex-1 justify-end gap-8 items-center">
-            <nav className="hidden md:flex items-center gap-9">
-              <Link to="/panel" className="text-slate-500 hover:text-[#143db8] text-sm font-medium transition-colors no-underline">Panel</Link>
-              <Link to="/history" className="text-[#143db8] text-sm font-bold border-b-2 border-[#143db8] pb-1 no-underline">Hasta Geçmişi</Link>
-              <Link to="#" className="text-slate-500 hover:text-[#143db8] text-sm font-medium transition-colors no-underline">Araştırma Laboratuvarı</Link>
-            </nav>
-            <div className="flex gap-3">
-              <button className="p-2 rounded-lg bg-[#143db8]/10 text-[#143db8] hover:bg-[#143db8]/20 transition-all">
-                <Bell size={20} />
-              </button>
-              <div className="w-10 h-10 rounded-full border-2 border-[#143db8]/20 p-0.5 overflow-hidden">
-                <img alt="Dr. İrem" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Irem" className="rounded-full w-full h-full object-cover" />
-              </div>
-            </div>
-          </div>
-        </header>
+      
 
         <main className="flex-1 px-6 py-8 md:px-20 lg:px-40 max-w-[1440px] mx-auto w-full">
           {/* Header Bölümü */}
