@@ -19,7 +19,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  async function login(email, password) {
+  async function login({ email, password }) {
     const { access_token } = await api.login({ email, password });
     localStorage.setItem("token", access_token);
     const me = await api.me();
@@ -27,9 +27,9 @@ export function AuthProvider({ children }) {
     return me;
   }
 
-  async function register(email, password, full_name) {
+  async function register({ email, password, full_name }) {
     await api.register({ email, password, full_name });
-    return login(email, password);
+    return login({ email, password });
   }
 
   function logout() {
