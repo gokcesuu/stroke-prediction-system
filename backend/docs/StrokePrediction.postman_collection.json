@@ -1,0 +1,284 @@
+{
+  "info": {
+    "name": "Stroke Prediction API",
+    "description": "XGBoost + MBO tabanlı inme risk tahmini sistemi API koleksiyonu.\n\n**Kullanım sırası:**\n1. Auth > Register ile kullanıcı oluştur\n2. Auth > Login ile token al (otomatik değişkene yazılır)\n3. Predictions > Create Prediction ile tahmin yap\n4. Predictions > My Predictions ile geçmişi gör",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "Login sonrası otomatik doldurulur"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET / — Sağlık Kontrolü",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "API'nin ayakta olup olmadığını kontrol eder. Auth gerektirmez."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"message\": \"Stroke Prediction API is running\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/register — Kayıt Ol",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@ornek.com\",\n  \"password\": \"guvenli123\",\n  \"full_name\": \"Test Kullanıcı\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Yeni kullanıcı kaydı oluşturur. E-posta unique olmalıdır."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"id\": 1,\n  \"email\": \"test@ornek.com\",\n  \"full_name\": \"Test Kullanıcı\",\n  \"created_at\": \"2024-04-22T20:00:00.000000\"\n}"
+            },
+            {
+              "name": "400 E-posta Zaten Kayıtlı",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"detail\": \"Bu e-posta zaten kayıtlı\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    console.log('Kayıt başarılı. Şimdi login yapabilirsiniz.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login — Giriş Yap",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@ornek.com\",\n  \"password\": \"guvenli123\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Kullanıcı girişi yapar. Başarılı olursa JWT token döner ve otomatik olarak `token` koleksiyon değişkenine yazılır."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"token_type\": \"bearer\"\n}"
+            },
+            {
+              "name": "401 Hatalı Kimlik Bilgisi",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"detail\": \"E-posta veya şifre hatalı\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('token', json.access_token);",
+                  "    console.log('Token koleksiyon değişkenine yazıldı.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "GET /users/me — Ben Kimim",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": ["{{base_url}}"],
+              "path": ["users", "me"]
+            },
+            "description": "Giriş yapmış kullanıcının bilgilerini döner. Login sonrası token gereklidir."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"id\": 1,\n  \"email\": \"test@ornek.com\",\n  \"full_name\": \"Test Kullanıcı\",\n  \"created_at\": \"2024-04-22T20:00:00.000000\"\n}"
+            },
+            {
+              "name": "401 Unauthorized",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"detail\": \"Geçersiz veya süresi dolmuş oturum\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Predictions",
+      "item": [
+        {
+          "name": "POST /predictions — Tahmin Yap",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gender\": \"Male\",\n  \"age\": 67,\n  \"hypertension\": 1,\n  \"heart_disease\": 1,\n  \"ever_married\": \"Yes\",\n  \"work_type\": \"Private\",\n  \"Residence_type\": \"Urban\",\n  \"avg_glucose_level\": 228.69,\n  \"bmi\": 36.6,\n  \"smoking_status\": \"formerly smoked\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/predictions",
+              "host": ["{{base_url}}"],
+              "path": ["predictions"]
+            },
+            "description": "XGBoost MBO modeli ile stroke riski hesaplar ve sonucu DB'ye kaydeder.\n\n**Residence_type büyük R ile yazılmalıdır.**\n\nGender: Male / Female / Other\nHypertension: 0 veya 1\nHeart_disease: 0 veya 1\nEver_married: Yes / No\nWork_type: Private / Self-employed / Govt_job / children / Never_worked\nResidence_type: Urban / Rural\nSmoking_status: never smoked / formerly smoked / smokes / Unknown"
+          },
+          "response": [
+            {
+              "name": "201 Created — Yüksek Risk",
+              "status": "Created",
+              "code": 201,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"id\": 15,\n  \"user_id\": 1,\n  \"input_data\": {\n    \"gender\": \"Male\",\n    \"age\": 67,\n    \"hypertension\": 1,\n    \"heart_disease\": 1,\n    \"ever_married\": \"Yes\",\n    \"work_type\": \"Private\",\n    \"Residence_type\": \"Urban\",\n    \"avg_glucose_level\": 228.69,\n    \"bmi\": 36.6,\n    \"smoking_status\": \"formerly smoked\"\n  },\n  \"result_data\": {\n    \"probability\": 0.7090753316879272,\n    \"percentage\": 70.91,\n    \"threshold_used\": 0.65,\n    \"prediction\": 1,\n    \"risk_level\": \"Yüksek Risk\"\n  },\n  \"created_at\": \"2024-04-22T21:30:00.000000\"\n}"
+            },
+            {
+              "name": "201 Created — Düşük Risk",
+              "status": "Created",
+              "code": 201,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"id\": 16,\n  \"user_id\": 1,\n  \"input_data\": {\n    \"gender\": \"Female\",\n    \"age\": 29,\n    \"hypertension\": 0,\n    \"heart_disease\": 0,\n    \"ever_married\": \"No\",\n    \"work_type\": \"Private\",\n    \"Residence_type\": \"Rural\",\n    \"avg_glucose_level\": 85.0,\n    \"bmi\": 22.1,\n    \"smoking_status\": \"never smoked\"\n  },\n  \"result_data\": {\n    \"probability\": 0.1234567890,\n    \"percentage\": 12.35,\n    \"threshold_used\": 0.65,\n    \"prediction\": 0,\n    \"risk_level\": \"Düşük Risk\"\n  },\n  \"created_at\": \"2024-04-22T21:35:00.000000\"\n}"
+            },
+            {
+              "name": "401 Unauthorized",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"detail\": \"Geçersiz veya süresi dolmuş oturum\"\n}"
+            },
+            {
+              "name": "422 Eksik Alan",
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"detail\": [\n    {\n      \"type\": \"missing\",\n      \"loc\": [\"body\", \"avg_glucose_level\"],\n      \"msg\": \"Field required\",\n      \"input\": {}\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET /predictions/me — Geçmişim",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/predictions/me",
+              "host": ["{{base_url}}"],
+              "path": ["predictions", "me"]
+            },
+            "description": "Giriş yapmış kullanıcının tüm tahmin geçmişini en yeniden eskiye sıralı döner."
+          },
+          "response": [
+            {
+              "name": "200 OK — Liste",
+              "status": "OK",
+              "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "[\n  {\n    \"id\": 15,\n    \"user_id\": 1,\n    \"input_data\": {\n      \"gender\": \"Male\",\n      \"age\": 67,\n      \"hypertension\": 1,\n      \"heart_disease\": 1,\n      \"ever_married\": \"Yes\",\n      \"work_type\": \"Private\",\n      \"Residence_type\": \"Urban\",\n      \"avg_glucose_level\": 228.69,\n      \"bmi\": 36.6,\n      \"smoking_status\": \"formerly smoked\"\n    },\n    \"result_data\": {\n      \"probability\": 0.7090753316879272,\n      \"percentage\": 70.91,\n      \"threshold_used\": 0.65,\n      \"prediction\": 1,\n      \"risk_level\": \"Yüksek Risk\"\n    },\n    \"created_at\": \"2024-04-22T21:30:00.000000\"\n  }\n]"
+            },
+            {
+              "name": "200 OK — Boş Liste",
+              "status": "OK",
+              "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "[]"
+            },
+            {
+              "name": "401 Unauthorized",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"detail\": \"Geçersiz veya süresi dolmuş oturum\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

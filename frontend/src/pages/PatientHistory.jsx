@@ -1,167 +1,418 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { 
-  Activity, Bell, Search, Filter, Calendar, 
-  CheckCircle2, MoreVertical, Plus, ChevronLeft, 
-  ChevronRight, TrendingUp, Users, Brain, ShieldCheck
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Activity, Search, Filter, Calendar,
+  CheckCircle2, MoreVertical, Plus, ChevronLeft,
+  ChevronRight, TrendingUp, Users, Brain, X, AlertTriangle, CheckCircle
 } from 'lucide-react';
+import { api } from '../services/api';
 
-const PatientHistory = () => {
-  const patients = [
-    { id: '#SP-8821', name: 'Jonathan Doe', initial: 'JD', date: '24 Eki 2023', time: '09:45', risk: 82, accuracy: 94.2, status: 'Tamamlandı', color: 'blue' },
-    { id: '#SP-9012', name: 'Sarah Miller', initial: 'SM', date: '22 Eki 2023', time: '14:15', risk: 45, accuracy: 91.8, status: 'İnceleme Bekliyor', color: 'purple' },
-    { id: '#SP-7734', name: 'Robert White', initial: 'RW', date: '20 Eki 2023', time: '11:30', risk: 12, accuracy: 97.5, status: 'Tamamlandı', color: 'emerald' },
-    { id: '#SP-8110', name: 'Emily Knight', initial: 'EK', date: '19 Eki 2023', time: '16:50', risk: 68, accuracy: 95.0, status: 'Tamamlandı', color: 'rose' },
+const PAGE_SIZE = 10;
+
+const riskColor = (pct) => {
+  if (pct >= 70) return 'text-red-600';
+  if (pct >= 35) return 'text-amber-600';
+  return 'text-emerald-600';
+};
+
+const riskBarColor = (pct) => {
+  if (pct >= 70) return 'bg-red-500';
+  if (pct >= 35) return 'bg-amber-500';
+  return 'bg-emerald-500';
+};
+
+const riskBadge = (pct) => {
+  if (pct >= 70) return 'bg-red-100 text-red-700';
+  if (pct >= 35) return 'bg-amber-100 text-amber-700';
+  return 'bg-emerald-100 text-emerald-700';
+};
+
+const riskLabel = (pct) => {
+  if (pct >= 70) return 'Yüksek Risk';
+  if (pct >= 35) return 'Orta Risk';
+  return 'Düşük Risk';
+};
+
+const formatDate = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const formatTime = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+};
+
+// Detay modalı
+const DetailModal = ({ prediction, onClose }) => {
+  if (!prediction) return null;
+  const pct = prediction.result_data?.percentage ?? 0;
+  const inp = prediction.input_data ?? {};
+
+  const rows = [
+    ['Yaş', inp.age],
+    ['Cinsiyet', inp.gender === 'Male' ? 'Erkek' : inp.gender === 'Female' ? 'Kadın' : inp.gender],
+    ['BMI', inp.bmi],
+    ['Ortalama Glikoz', inp.avg_glucose_level ? `${inp.avg_glucose_level} mg/dL` : '—'],
+    ['Hipertansiyon', parseInt(inp.hypertension) === 1 ? 'Var' : 'Yok'],
+    ['Kalp Hastalığı', parseInt(inp.heart_disease) === 1 ? 'Var' : 'Yok'],
+    ['Sigara', inp.smoking_status],
+    ['Çalışma Türü', inp.work_type],
+    ['Bölge', inp.Residence_type],
   ];
 
   return (
-    <div className="bg-[#f6f6f8] dark:bg-[#111521] font-sans text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-300">
-      <div className="flex h-full flex-col">
-      
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        {/* Modal header */}
+        <div className="flex items-center justify-between px-6 py-4 bg-[#143db8]/5 border-b border-[#143db8]/10">
+          <div>
+            <h3 className="font-black text-slate-900 text-sm uppercase tracking-wide">Analiz Detayı</h3>
+            <p className="text-xs text-slate-500">{formatDate(prediction.created_at)} — {formatTime(prediction.created_at)}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+            <X size={18} className="text-slate-500" />
+          </button>
+        </div>
 
-        <main className="flex-1 px-6 py-8 md:px-20 lg:px-40 max-w-[1440px] mx-auto w-full">
-          {/* Header Bölümü */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-            <div>
-              <nav className="flex text-sm text-slate-500 mb-2 gap-2">
-                <span>Analiz</span> <span>/</span> <span className="text-[#143db8] font-medium">Geçmiş</span>
-              </nav>
-              <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">Hasta Geçmişi</h1>
-              <p className="text-slate-500 dark:text-slate-400 mt-1">Geçmiş inme riski değerlendirmelerini ve MBO doğruluğunu inceleyin.</p>
-            </div>
-            <button className="bg-[#143db8] text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-[#143db8]/90 transition-all shadow-lg shadow-[#143db8]/20">
-              <Plus size={18} /> Yeni Değerlendirme
+        {/* Risk sonucu */}
+        <div className={`px-6 py-4 flex items-center gap-4 border-b ${pct >= 70 ? 'bg-red-50 border-red-100' : pct >= 35 ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'}`}>
+          <div className={`text-4xl font-black ${riskColor(pct)}`}>%{pct}</div>
+          <div>
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${riskBadge(pct)}`}>{riskLabel(pct)}</span>
+            <p className="text-[11px] text-slate-500 mt-1">{prediction.result_data?.risk_level ?? ''}</p>
+          </div>
+        </div>
+
+        {/* Girdi verileri */}
+        <div className="px-6 py-4">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Girilen Veriler</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+            {rows.map(([key, val]) => (
+              <div key={key} className="flex justify-between text-[11px]">
+                <span className="text-slate-500">{key}</span>
+                <span className="font-bold text-slate-900">{val ?? '—'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="px-6 pb-5">
+          <button
+            onClick={onClose}
+            className="w-full bg-[#143db8] text-white py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all"
+          >
+            Kapat
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PatientHistory = () => {
+  const navigate = useNavigate();
+  const [predictions, setPredictions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    document.title = 'Geçmiş — StrokePredict AI';
+    fetchPredictions();
+  }, []);
+
+  const fetchPredictions = async () => {
+    setLoading(true);
+    try {
+      const data = await api.myPredictions();
+      setPredictions(data);
+    } catch (err) {
+      setError(err.message || 'Veriler yüklenemedi.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Client-side arama (tarihe veya riske göre)
+  const filtered = predictions.filter((p) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const date = formatDate(p.created_at).toLowerCase();
+    const risk = String(p.result_data?.percentage ?? '');
+    const level = riskLabel(p.result_data?.percentage ?? 0).toLowerCase();
+    return date.includes(q) || risk.includes(q) || level.includes(q);
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Yan panel istatistikleri
+  const totalCount = predictions.length;
+  const avgRisk = totalCount > 0
+    ? Math.round(predictions.reduce((acc, p) => acc + (p.result_data?.percentage ?? 0), 0) / totalCount)
+    : 0;
+  const highRiskCount = predictions.filter((p) => (p.result_data?.percentage ?? 0) >= 70).length;
+
+  // Mini grafik için son 6 tahmin
+  const last6 = predictions.slice(0, 6).reverse().map((p) => p.result_data?.percentage ?? 0);
+  const maxVal = Math.max(...last6, 1);
+
+  return (
+    <div className="bg-[#f6f6f8] font-sans text-slate-900 min-h-screen">
+      {selected && <DetailModal prediction={selected} onClose={() => setSelected(null)} />}
+
+      <main className="flex-1 px-6 py-8 md:px-20 lg:px-40 max-w-[1440px] mx-auto w-full">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+          <div>
+            <nav className="flex text-sm text-slate-500 mb-2 gap-2">
+              <span>Analiz</span> <span>/</span> <span className="text-[#143db8] font-medium">Geçmiş</span>
+            </nav>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Hasta Geçmişi</h1>
+            <p className="text-slate-500 mt-1">Geçmiş inme riski değerlendirmelerini ve MBO doğruluğunu inceleyin.</p>
+          </div>
+          <button
+            onClick={() => navigate('/analysis')}
+            className="bg-[#143db8] text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-[#143db8]/90 transition-all shadow-lg shadow-[#143db8]/20"
+          >
+            <Plus size={18} /> Yeni Değerlendirme
+          </button>
+        </div>
+
+        {/* Arama + Filtre */}
+        <div className="bg-white/70 backdrop-blur-md rounded-xl p-4 mb-6 flex flex-col lg:flex-row gap-4 items-center border border-white/30 shadow-sm">
+          <div className="relative w-full lg:flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              className="w-full pl-12 pr-4 py-3 rounded-lg border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-[#143db8]/50 transition-all outline-none"
+              placeholder="Tarih, risk yüzdesi veya risk seviyesine göre ara..."
+              type="text"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+            <button
+              onClick={() => { setSearch('yüksek'); setPage(1); }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[#143db8]/10 rounded-lg text-sm font-medium hover:border-[#143db8] transition-all"
+            >
+              <Filter size={18} /> Yüksek Risk
+            </button>
+            <button
+              onClick={() => { setSearch(''); setPage(1); }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[#143db8]/10 rounded-lg text-sm font-medium hover:border-[#143db8] transition-all"
+            >
+              <Calendar size={18} /> Tümü
             </button>
           </div>
+        </div>
 
-          {/* Filtre ve Arama - Cam Efektli */}
-          <div className="bg-white/70 dark:bg-white/5 backdrop-blur-md rounded-xl p-4 mb-6 flex flex-col lg:flex-row gap-4 items-center border border-white/30 shadow-sm">
-            <div className="relative w-full lg:flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                className="w-full pl-12 pr-4 py-3 rounded-lg border-[#143db8]/10 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-[#143db8]/50 transition-all outline-none" 
-                placeholder="Hasta adı, ID veya klinisyene göre ara..." 
-                type="text"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-              <button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-[#143db8]/10 rounded-lg text-sm font-medium hover:border-[#143db8] transition-all">
-                <Filter size={18} /> Risk Seviyesi
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-[#143db8]/10 rounded-lg text-sm font-medium hover:border-[#143db8] transition-all">
-                <Calendar size={18} /> Tarih Aralığı
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Veri Tablosu */}
-            <div className="lg:col-span-3">
-              <div className="bg-white/70 dark:bg-white/5 backdrop-blur-md rounded-xl overflow-hidden border border-white/30 shadow-sm">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-[#143db8]/5 text-slate-500 uppercase text-[10px] font-black tracking-widest border-b border-[#143db8]/10">
-                      <th className="px-6 py-4">Değerlendirme Tarihi</th>
-                      <th className="px-6 py-4">Hasta Adı</th>
-                      <th className="px-6 py-4">Risk %</th>
-                      <th className="px-6 py-4">MBO Doğruluğu</th>
-                      <th className="px-6 py-4">Durum</th>
-                      <th className="px-6 py-4 text-right">İşlemler</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#143db8]/5">
-                    {patients.map((p, i) => (
-                      <tr key={i} className="hover:bg-[#143db8]/5 transition-colors group cursor-pointer">
-                        <td className="px-6 py-4 text-sm">
-                          <div className="font-bold text-slate-900 dark:text-white">{p.date}</div>
-                          <div className="text-xs text-slate-500">{p.time}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full bg-${p.color}-100 flex items-center justify-center text-${p.color}-600 font-bold text-xs uppercase`}>{p.initial}</div>
-                            <div>
-                              <div className="text-sm font-bold text-slate-900 dark:text-white">{p.name}</div>
-                              <div className="text-[10px] text-slate-500">ID: {p.id}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-12 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                              <div className={`h-full ${p.risk > 70 ? 'bg-red-500' : 'bg-amber-500'}`} style={{ width: `${p.risk}%` }}></div>
-                            </div>
-                            <span className={`text-sm font-bold ${p.risk > 70 ? 'text-red-600' : 'text-amber-600'}`}>%{p.risk}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 font-bold text-emerald-600">%{p.accuracy}</td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${p.status === 'Tamamlandı' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {p.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right"><MoreVertical size={16} className="inline text-slate-400" /></td>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Tablo */}
+          <div className="lg:col-span-3">
+            <div className="bg-white/70 backdrop-blur-md rounded-xl overflow-hidden border border-white/30 shadow-sm">
+              {loading ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#143db8]"></div>
+                  <span className="ml-3 text-sm text-slate-500">Veriler yükleniyor...</span>
+                </div>
+              ) : error ? (
+                <div className="flex items-center justify-center py-20 gap-2 text-red-600">
+                  <AlertTriangle size={20} />
+                  <span className="text-sm">{error}</span>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                  <Brain size={40} className="mb-3 opacity-30" />
+                  <p className="text-sm font-medium">
+                    {search ? 'Arama kriterine uygun kayıt bulunamadı.' : 'Henüz analiz yapılmamış.'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-[#143db8]/5 text-slate-500 uppercase text-[10px] font-black tracking-widest border-b border-[#143db8]/10">
+                        <th className="px-6 py-4">Tarih</th>
+                        <th className="px-6 py-4">Risk %</th>
+                        <th className="px-6 py-4">Seviye</th>
+                        <th className="px-6 py-4">Yaş / Cinsiyet</th>
+                        <th className="px-6 py-4 text-right">Detay</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="p-4 border-t border-[#143db8]/10 flex items-center justify-between text-xs text-slate-500">
-                  <span>1.280 hasta arasından 4 tanesi gösteriliyor</span>
-                  <div className="flex gap-1">
-                    <button className="w-8 h-8 flex items-center justify-center rounded border border-[#143db8]/10 hover:bg-[#143db8]/5"><ChevronLeft size={14}/></button>
-                    <button className="w-8 h-8 flex items-center justify-center rounded bg-[#143db8] text-white font-bold">1</button>
-                    <button className="w-8 h-8 flex items-center justify-center rounded border border-[#143db8]/10 hover:bg-[#143db8]/5">2</button>
-                    <button className="w-8 h-8 flex items-center justify-center rounded border border-[#143db8]/10 hover:bg-[#143db8]/5"><ChevronRight size={14}/></button>
+                    </thead>
+                    <tbody className="divide-y divide-[#143db8]/5">
+                      {paginated.map((p, i) => {
+                        const pct = p.result_data?.percentage ?? 0;
+                        const inp = p.input_data ?? {};
+                        return (
+                          <tr
+                            key={p.id ?? i}
+                            className="hover:bg-[#143db8]/5 transition-colors cursor-pointer"
+                            onClick={() => setSelected(p)}
+                          >
+                            <td className="px-6 py-4 text-sm">
+                              <div className="font-bold text-slate-900">{formatDate(p.created_at)}</div>
+                              <div className="text-xs text-slate-500">{formatTime(p.created_at)}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <div className="w-12 bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full ${riskBarColor(pct)}`}
+                                    style={{ width: `${pct}%` }}
+                                  ></div>
+                                </div>
+                                <span className={`text-sm font-bold ${riskColor(pct)}`}>%{pct}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${riskBadge(pct)}`}>
+                                {riskLabel(pct)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-slate-600">
+                              {inp.age ? `${inp.age} yaş` : '—'} / {inp.gender === 'Male' ? 'E' : inp.gender === 'Female' ? 'K' : '—'}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelected(p); }}
+                                className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                              >
+                                <MoreVertical size={16} className="text-slate-400" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {/* Sayfalama */}
+                  <div className="p-4 border-t border-[#143db8]/10 flex items-center justify-between text-xs text-slate-500">
+                    <span>
+                      {filtered.length} kayıttan {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} gösteriliyor
+                    </span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="w-8 h-8 flex items-center justify-center rounded border border-[#143db8]/10 hover:bg-[#143db8]/5 disabled:opacity-40"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((n) => n === 1 || n === totalPages || Math.abs(n - page) <= 1)
+                        .map((n, idx, arr) => (
+                          <React.Fragment key={n}>
+                            {idx > 0 && arr[idx - 1] !== n - 1 && (
+                              <span className="w-8 h-8 flex items-center justify-center text-slate-400">…</span>
+                            )}
+                            <button
+                              onClick={() => setPage(n)}
+                              className={`w-8 h-8 flex items-center justify-center rounded font-bold ${
+                                page === n
+                                  ? 'bg-[#143db8] text-white'
+                                  : 'border border-[#143db8]/10 hover:bg-[#143db8]/5'
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          </React.Fragment>
+                        ))}
+                      <button
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        className="w-8 h-8 flex items-center justify-center rounded border border-[#143db8]/10 hover:bg-[#143db8]/5 disabled:opacity-40"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
                   </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Yan Panel */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Risk Trend */}
+            <div className="bg-white/70 backdrop-blur-md rounded-xl p-5 border-l-4 border-[#143db8] shadow-sm">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex justify-between items-center">
+                Risk Trendi
+                {highRiskCount > 0 && (
+                  <span className="bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded tracking-tighter">
+                    {highRiskCount} YÜKSEK
+                  </span>
+                )}
+              </h3>
+              <div className="mb-4">
+                <p className="text-[10px] text-slate-500 font-bold mb-1">SON 6 ANALİZ</p>
+                <div className="h-24 bg-blue-600/5 rounded-lg flex items-end p-2 gap-1 overflow-hidden">
+                  {last6.length > 0 ? last6.map((h, i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 rounded-t-sm transition-all hover:opacity-80 ${h >= 70 ? 'bg-red-400' : h >= 35 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                      style={{ height: `${(h / maxVal) * 100}%` }}
+                      title={`%${h}`}
+                    ></div>
+                  )) : (
+                    <div className="flex-1 flex items-center justify-center text-[10px] text-slate-400">Veri yok</div>
+                  )}
                 </div>
+              </div>
+              <div className="text-[11px] text-slate-500">
+                Son 6 analiz ortalaması:{' '}
+                <span className={`font-bold ${riskColor(avgRisk)}`}>%{avgRisk}</span>
               </div>
             </div>
 
-            {/* Yan Panel */}
-            <div className="lg:col-span-1 space-y-6">
-              <div className="bg-white/70 dark:bg-white/5 backdrop-blur-md rounded-xl p-5 border-l-4 border-[#143db8] shadow-sm">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex justify-between items-center">
-                  Aktif Trend <span className="bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded tracking-tighter">YÜKSEK RİSK</span>
-                </h3>
-                <div className="mb-4">
-                  <p className="text-[10px] text-slate-500 font-bold mb-1">HİSTOGRAM: JONATHAN DOE</p>
-                  <div className="h-24 bg-blue-600/5 rounded-lg flex items-end p-2 gap-1 overflow-hidden">
-                    {[40, 70, 45, 90, 65, 82].map((h, i) => (
-                      <div key={i} className="flex-1 bg-[#143db8]/30 rounded-t-sm transition-all hover:bg-[#143db8]" style={{ height: `${h}%` }}></div>
-                    ))}
+            {/* Performans Özeti */}
+            <div className="bg-white/70 backdrop-blur-md rounded-xl p-5 border border-white/30 shadow-sm">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Performans Özeti</h3>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-[#143db8]">
+                    <Users size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-slate-400 font-black">TOPLAM ANALİZ</p>
+                    <p className="text-lg font-black text-slate-900">
+                      {loading ? '...' : totalCount.toLocaleString('tr-TR')}
+                    </p>
                   </div>
                 </div>
-                <div className="space-y-2 text-[11px]">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Kan Basıncı</span>
-                    <span className="font-bold text-red-600 font-serif">145/95 mmHg</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
+                    <TrendingUp size={20} />
                   </div>
-                  <button className="w-full mt-2 bg-slate-900 text-white py-2 rounded-lg font-bold text-[10px] hover:bg-slate-800 transition-colors uppercase">Profil Detayları</button>
+                  <div>
+                    <p className="text-[9px] text-slate-400 font-black">ORTALAMA RİSK</p>
+                    <p className={`text-lg font-black ${riskColor(avgRisk)}`}>
+                      {loading ? '...' : `%${avgRisk}`}
+                    </p>
+                  </div>
                 </div>
-              </div>
-
-              <div className="bg-white/70 dark:bg-white/5 backdrop-blur-md rounded-xl p-5 border border-white/30 shadow-sm">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Performans Özeti</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600"><CheckCircle2 size={24}/></div>
-                    <div>
-                      <p className="text-[9px] text-slate-400 font-black">ORTALAMA DOĞRULUK</p>
-                      <p className="text-lg font-black text-slate-900 dark:text-white">%95.4</p>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center text-red-600">
+                    <AlertTriangle size={20} />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-[#143db8]"><Users size={24}/></div>
-                    <div>
-                      <p className="text-[9px] text-slate-400 font-black">TOPLAM ANALİZ</p>
-                      <p className="text-lg font-black text-slate-900 dark:text-white">1,280</p>
-                    </div>
+                  <div>
+                    <p className="text-[9px] text-slate-400 font-black">YÜKSEK RİSK</p>
+                    <p className="text-lg font-black text-red-600">
+                      {loading ? '...' : highRiskCount}
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 };

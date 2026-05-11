@@ -1,30 +1,31 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
-from predict import predict_stroke_risk
+from fastapi.middleware.cors import CORSMiddleware
+
+from database import engine
+import models
+from routers import auth_router, users, predictions
+
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Stroke Prediction API",
     description="XGBoost + MBO optimized stroke risk prediction service",
-    version="1.0.0"
+    version="1.0.0",
 )
 
-class StrokeInput(BaseModel):
-    gender: str
-    age: float
-    hypertension: int
-    heart_disease: int
-    ever_married: str
-    work_type: str
-    Residence_type: str
-    avg_glucose_level: float
-    bmi: float
-    smoking_status: str
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router.router)
+app.include_router(users.router)
+app.include_router(predictions.router)
+
 
 @app.get("/")
 def home():
     return {"message": "Stroke Prediction API is running"}
-
-@app.post("/predict")
-def predict(data: StrokeInput):
-    result = predict_stroke_risk(data.dict())
-    return result
