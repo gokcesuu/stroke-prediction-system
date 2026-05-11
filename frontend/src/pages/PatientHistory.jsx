@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Activity, Search, Filter, Calendar,
+  Search, Filter, Calendar,
   CheckCircle2, MoreVertical, Plus, ChevronLeft,
-  ChevronRight, TrendingUp, Users, Brain, X, AlertTriangle, CheckCircle
+  ChevronRight, TrendingUp, Users, Brain, X, AlertTriangle, Download
 } from 'lucide-react';
 import { api } from '../services/api';
+import { generateStrokeReport, getInterpretation, getRiskWarnings } from '../utils/pdfReport';
 
 const PAGE_SIZE = 10;
 
@@ -48,26 +49,34 @@ const formatTime = (iso) => {
 // Detay modalı
 const DetailModal = ({ prediction, onClose }) => {
   if (!prediction) return null;
-  const pct = prediction.result_data?.percentage ?? 0;
-  const inp = prediction.input_data ?? {};
+  const pct  = Math.round((prediction.result_data?.percentage ?? 0) * 10) / 10;
+  const inp  = prediction.input_data ?? {};
+  const warnings    = getRiskWarnings(inp);
+  const interpretation = getInterpretation(pct, warnings);
+
+  const smokingTr = { 'never smoked': 'Hiç İçmedi', 'formerly smoked': 'Eski İçici', 'smokes': 'İçiyor', 'Unknown': 'Bilinmiyor' };
+  const workTr    = { 'Private': 'Özel Sektör', 'Self-employed': 'Serbest Meslek', 'Govt_job': 'Kamu', 'children': 'Çocuk', 'Never_worked': 'Hiç Çalışmadı' };
+  const resTr     = { 'Urban': 'Şehir', 'Rural': 'Kırsal' };
+  const genderTr  = { 'Male': 'Erkek', 'Female': 'Kadın', 'Other': 'Diğer' };
 
   const rows = [
-    ['Yaş', inp.age],
-    ['Cinsiyet', inp.gender === 'Male' ? 'Erkek' : inp.gender === 'Female' ? 'Kadın' : inp.gender],
-    ['BMI', inp.bmi],
+    ['Yaş',           inp.age],
+    ['Cinsiyet',      genderTr[inp.gender] ?? inp.gender],
+    ['BMI',           inp.bmi],
     ['Ortalama Glikoz', inp.avg_glucose_level ? `${inp.avg_glucose_level} mg/dL` : '—'],
-    ['Hipertansiyon', parseInt(inp.hypertension) === 1 ? 'Var' : 'Yok'],
-    ['Kalp Hastalığı', parseInt(inp.heart_disease) === 1 ? 'Var' : 'Yok'],
-    ['Sigara', inp.smoking_status],
-    ['Çalışma Türü', inp.work_type],
-    ['Bölge', inp.Residence_type],
+    ['Hipertansiyon', parseInt(inp.hypertension)  === 1 ? 'Var' : 'Yok'],
+    ['Kalp Hastalığı',parseInt(inp.heart_disease) === 1 ? 'Var' : 'Yok'],
+    ['Sigara',        smokingTr[inp.smoking_status] ?? inp.smoking_status],
+    ['Çalışma Türü',  workTr[inp.work_type] ?? inp.work_type],
+    ['Bölge',         resTr[inp.Residence_type] ?? inp.Residence_type],
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
+
         {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-[#143db8]/5 border-b border-[#143db8]/10">
+        <div className="flex items-center justify-between px-6 py-4 bg-[#143db8]/5 border-b border-[#143db8]/10 shrink-0">
           <div>
             <h3 className="font-black text-slate-900 text-sm uppercase tracking-wide">Analiz Detayı</h3>
             <p className="text-xs text-slate-500">{formatDate(prediction.created_at)} — {formatTime(prediction.created_at)}</p>
@@ -77,32 +86,67 @@ const DetailModal = ({ prediction, onClose }) => {
           </button>
         </div>
 
-        {/* Risk sonucu */}
-        <div className={`px-6 py-4 flex items-center gap-4 border-b ${pct >= 70 ? 'bg-red-50 border-red-100' : pct >= 35 ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'}`}>
-          <div className={`text-4xl font-black ${riskColor(pct)}`}>%{pct}</div>
-          <div>
-            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${riskBadge(pct)}`}>{riskLabel(pct)}</span>
-            <p className="text-[11px] text-slate-500 mt-1">{prediction.result_data?.risk_level ?? ''}</p>
+        <div className="overflow-y-auto flex-1">
+          {/* Risk sonucu */}
+          <div className={`px-6 py-4 flex items-center gap-4 border-b ${pct >= 70 ? 'bg-red-50 border-red-100' : pct >= 35 ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'}`}>
+            <div className={`text-4xl font-black ${riskColor(pct)}`}>%{pct}</div>
+            <div>
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${riskBadge(pct)}`}>{riskLabel(pct)}</span>
+              <p className="text-[11px] text-slate-500 mt-1">{prediction.result_data?.risk_level ?? ''}</p>
+            </div>
+          </div>
+
+          {/* Klinik yorum */}
+          <div className={`mx-5 mt-4 mb-2 p-4 rounded-xl text-[12px] leading-relaxed border ${
+            pct >= 70 ? 'bg-red-50 border-red-200 text-red-900'
+            : pct >= 35 ? 'bg-amber-50 border-amber-200 text-amber-900'
+            : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+          }`}>
+            <p className="font-black text-[10px] uppercase tracking-widest mb-1.5 opacity-60">Klinik Yorum</p>
+            <p>{interpretation}</p>
+          </div>
+
+          {/* Uyarı faktörleri */}
+          {warnings.length > 0 && (
+            <div className="mx-5 mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-1">
+                <AlertTriangle size={12} /> Dikkat Edilmesi Gerekenler
+              </p>
+              <ul className="space-y-1">
+                {warnings.map((w, i) => (
+                  <li key={i} className="text-[11px] text-amber-800 flex gap-2">
+                    <span className="text-amber-400 shrink-0">•</span>{w}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Girdi verileri */}
+          <div className="px-5 pb-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Girilen Veriler</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 bg-slate-50 rounded-xl p-3">
+              {rows.map(([key, val]) => (
+                <div key={key} className="flex justify-between text-[11px]">
+                  <span className="text-slate-500">{key}</span>
+                  <span className="font-bold text-slate-900">{val ?? '—'}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Girdi verileri */}
-        <div className="px-6 py-4">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Girilen Veriler</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-            {rows.map(([key, val]) => (
-              <div key={key} className="flex justify-between text-[11px]">
-                <span className="text-slate-500">{key}</span>
-                <span className="font-bold text-slate-900">{val ?? '—'}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="px-6 pb-5">
+        {/* Butonlar */}
+        <div className="px-5 pb-5 pt-3 border-t border-slate-100 flex gap-3 shrink-0">
+          <button
+            onClick={() => generateStrokeReport(prediction.result_data, prediction.input_data)}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-emerald-100 transition-all border border-emerald-200"
+          >
+            <Download size={15} /> PDF İndir
+          </button>
           <button
             onClick={onClose}
-            className="w-full bg-[#143db8] text-white py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all"
+            className="flex-1 bg-[#143db8] text-white py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all"
           >
             Kapat
           </button>

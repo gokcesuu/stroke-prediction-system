@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, Play, RefreshCcw, UserPlus, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
-import jsPDF from 'jspdf';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
+import { generateStrokeReport, getRiskWarnings } from '../utils/pdfReport';
 
 const INITIAL_FORM = {
   gender: 'Male',
@@ -30,31 +30,6 @@ const LOG_STEPS = [
   '> [SONUÇ] Risk hesaplaması tamamlandı.',
 ];
 
-const getRiskWarnings = (form) => {
-  const warnings = [];
-  const age = parseFloat(form.age);
-  const glucose = parseFloat(form.avg_glucose_level);
-  const bmi = parseFloat(form.bmi);
-
-  if (parseInt(form.hypertension) === 1)
-    warnings.push('Hipertansiyonunuz var — önemli bir inme risk faktörüdür');
-  if (parseInt(form.heart_disease) === 1)
-    warnings.push('Kalp hastalığı önemli bir inme risk faktörüdür');
-  if (form.smoking_status === 'smokes')
-    warnings.push('Aktif sigara kullanımı inme riskini artırır');
-  if (form.smoking_status === 'formerly smoked')
-    warnings.push('Geçmiş sigara kullanımı risk faktörü olarak değerlendirilir');
-  if (!isNaN(age) && age >= 65)
-    warnings.push('65 yaş üzeri yüksek riskli grup — düzenli doktor takibi önerilir');
-  else if (!isNaN(age) && age >= 50)
-    warnings.push('50 yaş üzeri düzenli kardiyoloji kontrolü önerilir');
-  if (!isNaN(glucose) && glucose >= 200)
-    warnings.push('Glikoz değeriniz yüksek — diyabet riski kontrol edilmeli');
-  if (!isNaN(bmi) && bmi >= 30)
-    warnings.push('BMI değeriniz obezite sınırında — kardiyovasküler riski artırır');
-
-  return warnings;
-};
 
 const validateForm = (form) => {
   const age = parseFloat(form.age);
@@ -152,172 +127,7 @@ const AnalysisPanel = () => {
     }
   }, [logs]);
 
-  const exportPDF = () => {
-    if (!result || !savedForm) return;
-
-    // jsPDF helvetica fontu Türkçe karakterleri desteklemez → ASCII karşılığı
-    const tr = (str) => String(str ?? '')
-      .replace(/ş/g, 's').replace(/Ş/g, 'S')
-      .replace(/ı/g, 'i').replace(/İ/g, 'I')
-      .replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
-      .replace(/ö/g, 'o').replace(/Ö/g, 'O')
-      .replace(/ü/g, 'u').replace(/Ü/g, 'U')
-      .replace(/ç/g, 'c').replace(/Ç/g, 'C')
-      .replace(/â/g, 'a').replace(/î/g, 'i').replace(/û/g, 'u');
-
-    // Dropdown değerlerini Türkçeye çevir
-    const smokingLabel = {
-      'never smoked': 'Hic icmedi',
-      'formerly smoked': 'Eski icici',
-      'smokes': 'Iciyor',
-      'Unknown': 'Bilinmiyor',
-    }[savedForm.smoking_status] ?? savedForm.smoking_status;
-
-    const workLabel = {
-      'Private': 'Ozel sektor',
-      'Self-employed': 'Serbest meslek',
-      'Govt_job': 'Kamu',
-      'children': 'Cocuk',
-      'Never_worked': 'Hic calismadi',
-    }[savedForm.work_type] ?? savedForm.work_type;
-
-    const residenceLabel = { 'Urban': 'Sehir', 'Rural': 'Kirsal' }[savedForm.Residence_type] ?? savedForm.Residence_type;
-    const genderLabel = { 'Male': 'Erkek', 'Female': 'Kadin', 'Other': 'Diger' }[savedForm.gender] ?? savedForm.gender;
-
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    // Yüzdeyi yuvarla: 27.299... → 27.3
-    const pct = Math.round(result.percentage * 10) / 10;
-    const level = pct >= 70 ? 'Yuksek Risk' : pct >= 35 ? 'Orta Risk' : 'Dusuk Risk';
-    const riskR = pct >= 70 ? 220 : pct >= 35 ? 180 : 22;
-    const riskG = pct >= 70 ? 38  : pct >= 35 ? 100 : 163;
-    const riskB = pct >= 70 ? 38  : pct >= 35 ? 6   : 74;
-
-    // ── BAŞLIK ──
-    pdf.setFillColor(20, 61, 184);
-    pdf.rect(0, 0, 210, 18, 'F');
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(13);
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('StrokePredict AI  |  Inme Riski Analiz Raporu', 15, 12);
-
-    // ── TARİH ──
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text(`Olusturulma tarihi: ${new Date().toLocaleDateString('tr-TR')}`, 15, 26);
-
-    // ── RİSK SKORU KUTUSU ──
-    pdf.setFillColor(riskR, riskG, riskB);
-    pdf.roundedRect(15, 32, 85, 28, 4, 4, 'F');
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(26);
-    pdf.setTextColor(255, 255, 255);
-    pdf.text(`%${pct}`, 20, 50);
-    pdf.setFontSize(11);
-    pdf.text(level, 20, 57);
-
-    // Model bilgisi kutusu
-    pdf.setFillColor(240, 244, 255);
-    pdf.roundedRect(108, 32, 87, 28, 4, 4, 'F');
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(9);
-    pdf.setTextColor(20, 61, 184);
-    pdf.text('MODEL BILGISi', 113, 40);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(60, 60, 60);
-    pdf.setFontSize(9);
-    pdf.text('Algoritma: XGBoost + MBO', 113, 47);
-    pdf.text('Esik Degeri: 0.65', 113, 53);
-    pdf.text('Olasilik: ' + result.probability ? `%${Math.round((result.probability ?? pct / 100) * 100 * 10) / 10}` : '-', 113, 59);
-
-    // ── GİRİLEN VERİLER ──
-    pdf.setDrawColor(220, 220, 220);
-    pdf.setLineWidth(0.3);
-    pdf.line(15, 68, 195, 68);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(11);
-    pdf.setTextColor(30, 30, 30);
-    pdf.text('Girilen Hasta Verileri', 15, 76);
-
-    const fields = [
-      ['Yas',           String(savedForm.age)],
-      ['Cinsiyet',      genderLabel],
-      ['BMI',           String(savedForm.bmi)],
-      ['Glikoz',        savedForm.avg_glucose_level + ' mg/dL'],
-      ['Hipertansiyon', parseInt(savedForm.hypertension) === 1 ? 'Var' : 'Yok'],
-      ['Kalp Hastaligi',parseInt(savedForm.heart_disease) === 1 ? 'Var' : 'Yok'],
-      ['Sigara',        smokingLabel],
-      ['Calisma Turu',  workLabel],
-      ['Bolge',         residenceLabel],
-      ['Medeni Durum',  savedForm.ever_married === 'Yes' ? 'Evli' : 'Bekar'],
-    ];
-
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    fields.forEach(([key, val], idx) => {
-      const col = idx % 2;
-      const row = Math.floor(idx / 2);
-      const x = col === 0 ? 15 : 108;
-      const y = 85 + row * 10;
-      // Arka plan alternatif satır
-      if (row % 2 === 0) {
-        pdf.setFillColor(248, 250, 255);
-        pdf.rect(col === 0 ? 15 : 108, y - 5, 88, 9, 'F');
-      }
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(`${key}:`, x + 2, y);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(30, 30, 30);
-      pdf.text(String(val), x + 38, y);
-      pdf.setFont('helvetica', 'normal');
-    });
-
-    // ── UYARI FAKTÖRLERİ ──
-    const warnings = getRiskWarnings(savedForm);
-    const warnStartY = 85 + Math.ceil(fields.length / 2) * 10 + 8;
-
-    pdf.setDrawColor(220, 220, 220);
-    pdf.line(15, warnStartY - 2, 195, warnStartY - 2);
-
-    if (warnings.length > 0) {
-      pdf.setFillColor(255, 248, 235);
-      pdf.roundedRect(15, warnStartY + 2, 180, 10 + warnings.length * 9, 3, 3, 'F');
-      pdf.setDrawColor(230, 160, 30);
-      pdf.roundedRect(15, warnStartY + 2, 180, 10 + warnings.length * 9, 3, 3, 'S');
-
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
-      pdf.setTextColor(160, 90, 0);
-      pdf.text('! Dikkat Edilmesi Gereken Risk Faktorleri', 20, warnStartY + 10);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9.5);
-      warnings.forEach((w, i) => {
-        pdf.setTextColor(120, 60, 0);
-        pdf.text(`• ${tr(w)}`, 22, warnStartY + 18 + i * 9);
-      });
-    } else {
-      pdf.setFillColor(235, 255, 245);
-      pdf.roundedRect(15, warnStartY + 2, 180, 16, 3, 3, 'F');
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
-      pdf.setTextColor(20, 130, 80);
-      pdf.text('Belirgin risk faktoru tespit edilmedi.', 20, warnStartY + 12);
-    }
-
-    // ── FOOTER ──
-    pdf.setFillColor(245, 247, 252);
-    pdf.rect(0, 272, 210, 25, 'F');
-    pdf.setFont('helvetica', 'italic');
-    pdf.setFontSize(8);
-    pdf.setTextColor(140, 140, 140);
-    pdf.text('Bu rapor StrokePredict AI tarafindan otomatik olusturulmustur.', 15, 280);
-    pdf.text('Tibbi teshis yerine geçmez. Kesin tani icin saglik profesyoneline basvurunuz.', 15, 286);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(20, 61, 184);
-    pdf.text('StrokePredict AI  |  strokepredict.ai', 140, 286);
-
-    pdf.save('Inme_Riski_Raporu.pdf');
-  };
+  const exportPDF = () => generateStrokeReport(result, savedForm);
 
   const handleAnalyze = async (e) => {
     e.preventDefault();
