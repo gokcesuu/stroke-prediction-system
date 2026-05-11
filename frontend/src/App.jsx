@@ -8,7 +8,6 @@ import PatientHistory from './pages/PatientHistory';
 import Documentation from './pages/Documentation';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import ResearchLab from './pages/ResearchLab';
 import NotFound from './pages/NotFound';
 import Navbar from './components/Navbar';
 import './index.css';
@@ -40,8 +39,6 @@ const AppContent = () => {
         {/* Herkese açık sayfalar */}
         <Route path="/landing" element={<Landing />} />
         <Route path="/docs" element={<Documentation />} />
-        <Route path="/lab" element={<ResearchLab />} />
-
         {/* Korumalı sayfalar */}
         <Route path="/analysis" element={<ProtectedRoute><AnalysisPanel /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><PatientHistory /></ProtectedRoute>} />
