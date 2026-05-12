@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Play, RefreshCcw, UserPlus, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Download, Play, RefreshCcw, UserPlus, Activity, AlertTriangle, CheckCircle, MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { generateStrokeReport, getRiskWarnings } from '../utils/pdfReport';
@@ -312,6 +312,18 @@ const AnalysisPanel = () => {
                 className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-50 text-emerald-700 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-100 transition-all border border-emerald-200"
               >
                 <Download size={16} /> PDF Raporu İndir
+              </button>
+              <button
+                onClick={() => navigate('/chat', {
+                  state: {
+                    risk_level:      result?.risk_level,
+                    risk_percentage: pct,
+                    patient_data:    savedForm,
+                  }
+                })}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-[#143db8]/5 text-[#143db8] rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#143db8]/10 transition-all border border-[#143db8]/20"
+              >
+                <MessageCircle size={16} /> AI ile Konuş
               </button>
             )}
           </div>

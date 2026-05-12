@@ -9,6 +9,7 @@ import Documentation from './pages/Documentation';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import NotFound from './pages/NotFound';
+import ChatPage from './pages/ChatPage';
 import Navbar from './components/Navbar';
 import './index.css';
 
@@ -42,6 +43,7 @@ const AppContent = () => {
         {/* Korumalı sayfalar */}
         <Route path="/analysis" element={<ProtectedRoute><AnalysisPanel /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><PatientHistory /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
 
         {/* 404 */}
         <Route path="*" element={<NotFound />} />

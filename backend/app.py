@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import engine
 import models
-from routers import auth_router, users, predictions
+from routers import auth_router, users, predictions, chatbot
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -24,6 +24,7 @@ app.add_middleware(
 app.include_router(auth_router.router)
 app.include_router(users.router)
 app.include_router(predictions.router)
+app.include_router(chatbot.router)
 
 
 @app.get("/")
